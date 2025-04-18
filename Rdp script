@@ -1,0 +1,56 @@
+# 🔐 Windows RDP via GitHub Actions + Ngrok
+
+Ce projet permet de créer une session **Bureau à distance (RDP)** de 6 heures sur un environnement **Windows Server GitHub Actions**, accessible depuis **n’importe où via Ngrok**, sans adresse IP publique.
+
+## 🚀 Fonctionnalités
+
+- Création automatique d’un tunnel RDP avec **Ngrok**
+- Accès sécurisé à distance via **GitHub Actions**
+- Environnement **Windows Server 2022**
+- Session de **6 heures maximum** (limite GitHub Actions)
+
+## ⚙️ Prérequis
+
+1. Un compte **Ngrok** : [https://ngrok.com/](https://ngrok.com/)
+2. Récupérez votre **auth token** Ngrok.
+3. Créez un secret dans votre dépôt GitHub :
+
+   - Nom du secret : `NGROK_AUTH_TOKEN`
+   - Valeur : votre token Ngrok
+
+## 📂 Structure du workflow
+
+Voici le fichier `.github/workflows/rdp.yml` utilisé :
+
+```yaml
+name: CI
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Download
+      run: Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+
+    - name: Extract
+      run: Expand-Archive ngrok.zip
+
+    - name: Auth
+      run: .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Enable TS
+      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+
+    - run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+    - run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+
+    - run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+
+    - name: Create Tunnel
+      run: .\ngrok\ngrok.exe tcp 3389
